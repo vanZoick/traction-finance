@@ -1,0 +1,65 @@
+rules_version = '2';
+
+// =====================================================================
+// Traction Finance — regras de segurança do Firestore
+//
+// Isto é o que de fato protege os dados. O código da página roda no
+// navegador de quem acessa e pode ser alterado por quem quiser; estas
+// regras rodam no servidor do Google e não podem.
+//
+// Onde colar: console do Firebase → Firestore Database → aba Regras →
+// substituir tudo → Publicar.
+// =====================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Está no beta? Só quem tem um convite criado por você, na coleção
+    // "convites", com o e-mail em minúsculas como id do documento.
+    function convidado() {
+      return request.auth != null
+          && request.auth.token.email != null
+          && exists(/databases/$(database)/documents/convites/$(request.auth.token.email.lower()));
+    }
+
+    // -----------------------------------------------------------------
+    // Os dados de cada pessoa.
+    // A conta só alcança o próprio caminho: request.auth.uid == uid.
+    // Ninguém lê o de ninguém — nem você, pelo aplicativo. Para ver os
+    // seus próprios dados fora da página, use o console do Firebase.
+    // -----------------------------------------------------------------
+    match /usuarios/{uid}/{resto=**} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == uid
+                         && convidado();
+    }
+
+    // -----------------------------------------------------------------
+    // Feedback dos testadores. Quem está no beta só consegue criar, e
+    // nunca ler, editar ou apagar — inclusive o que escreveu. Você lê
+    // tudo pelo console do Firebase.
+    // -----------------------------------------------------------------
+    match /feedback/{id} {
+      allow create: if convidado()
+                    && request.resource.data.texto is string
+                    && request.resource.data.texto.size() > 0
+                    && request.resource.data.texto.size() <= 4000;
+      allow read, update, delete: if false;
+    }
+
+    // -----------------------------------------------------------------
+    // A lista de convidados. Fechada para a aplicação inteira: a função
+    // convidado() acima consegue consultá-la porque exists() roda com
+    // privilégio de servidor, mas nenhuma página consegue ler nem
+    // escrever aqui. Você convida e revoga pelo console.
+    // -----------------------------------------------------------------
+    match /convites/{email} {
+      allow read, write: if false;
+    }
+
+    // Qualquer outro caminho: ninguém.
+    match /{documento=**} {
+      allow read, write: if false;
+    }
+  }
+}

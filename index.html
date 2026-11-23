@@ -3228,6 +3228,48 @@ function LocalDB(){
 }
 
 /* ===== Backup: serve nos dois modos, inclusive para levar os dados de um para o outro ===== */
+
+/* ----------------------------------------------------------------------
+   Backup de TODOS os perfis
+   O pacote antigo (sem `perfisDados`) continua valendo: so restaura o perfil
+   em uso, como sempre fez.
+   ---------------------------------------------------------------------- */
+function prefixoDe(id){ return RAIZ+(id==='principal'?'':'p/'+id+'/') }
+
+/* le um perfil inteiro do banco, no formato do pacote */
+function lePerfil(id){
+  if(!DB) return Promise.resolve(null);
+  var px=prefixoDe(id), out={meses:{},lancamentos:[],dividas:[],cartoes:[],
+    metas:[],desejos:[],investimentos:[],plano:null,reserva:[]};
+  function col(n){ return DB.collection(px+n).get().catch(function(){ return {docs:[]} }) }
+  function doc(p){ return DB.doc(px+p).get().catch(function(){ return {exists:false} }) }
+  return Promise.all([col('meses'),col('lancamentos'),doc('plano/anual'),
+                      doc('reserva/historico')].concat(
+      ['dividas','cartoes','metas','desejos','investimentos'].map(function(n){ return doc(n+'/lista') })))
+  .then(function(r){
+    (r[0].docs||[]).forEach(function(d){ out.meses[d.id]=d.data() });
+    (r[1].docs||[]).forEach(function(d){ var o=d.data()||{}; if(!o.id)o.id=d.id; out.lancamentos.push(o) });
+    if(r[2]&&r[2].exists) out.plano=r[2].data();
+    if(r[3]&&r[3].exists) out.reserva=(r[3].data()||{}).pontos||[];
+    ['dividas','cartoes','metas','desejos','investimentos'].forEach(function(n,i){
+      var d=r[4+i]; out[n]=(d&&d.exists&&(d.data()||{}).itens)||[] });
+    return out;
+  });
+}
+
+/* grava um perfil inteiro no banco, a partir do formato do pacote */
+function gravaPerfil(id,o){
+  if(!DB||!o) return Promise.resolve();
+  var px=prefixoDe(id), ps=[];
+  function põe(p,b){ ps.push(DB.doc(px+p).set(b).catch(function(){})) }
+  Object.keys(o.meses||{}).forEach(function(k){ põe('meses/'+k,o.meses[k]) });
+  (o.lancamentos||[]).forEach(function(l){ if(l&&l.id) põe('lancamentos/'+l.id,l) });
+  ['dividas','cartoes','metas','desejos','investimentos'].forEach(function(n){ põe(n+'/lista',{itens:o[n]||[]}) });
+  põe('reserva/historico',{pontos:o.reserva||[]});
+  if(o.plano) põe('plano/anual',o.plano);
+  return Promise.all(ps);
+}
+
 function pacote(){
   return { app:'traction-finance', v:1, quando:new Date().toISOString(),
     cfg:cfg, perfis:perfis, meses:meses, lancamentos:lancs, dividas:dividas,
@@ -3243,12 +3285,21 @@ function baixaDireto(txt,nome){
   }catch(e){ toast('Não deu para baixar aqui') }
 }
 function exportaDados(){
-  var txt=JSON.stringify(pacote(),null,1), nome='traction-finance-'+HOJE_ISO+'.json';
-  var p=(typeof claude!=='undefined'&&claude&&claude.use)?claude.use('downloads'):Promise.resolve(null);
-  Promise.resolve(p).then(function(d){
-    if(d&&d.save) return d.save({filename:nome,data:txt}).then(function(){ toast('Backup salvo') });
-    baixaDireto(txt,nome);
-  }).catch(function(){ baixaDireto(txt,nome) });
+  var nome='traction-finance-'+HOJE_ISO+'.json';
+  /* os perfis que nao estao abertos vem do banco antes de fechar o pacote */
+  var outros=perfis.filter(function(x){ return x.id!==PERFIL });
+  Promise.all(outros.map(function(x){ return lePerfil(x.id).catch(function(){ return null }) }))
+  .then(function(rs){
+    var o=pacote();
+    o.perfisDados={};
+    outros.forEach(function(x,i){ if(rs[i]) o.perfisDados[x.id]=rs[i] });
+    var txt=JSON.stringify(o,null,1);
+    var p=(typeof claude!=='undefined'&&claude&&claude.use)?claude.use('downloads'):Promise.resolve(null);
+    return Promise.resolve(p).then(function(d){
+      if(d&&d.save) return d.save({filename:nome,data:txt}).then(function(){ toast('Backup salvo') });
+      baixaDireto(txt,nome);
+    }).catch(function(){ baixaDireto(txt,nome) });
+  }).catch(function(){ baixaDireto(JSON.stringify(pacote(),null,1),nome) });
 }
 function importaDados(txt){
   var o=null; try{ o=JSON.parse(txt) }catch(e){}
@@ -3264,6 +3315,9 @@ function importaDados(txt){
   if(planoAno)save('plano/anual',planoAno,false);
   Object.keys(meses).forEach(function(k){ saveMes(k,false) });
   lancs.forEach(function(l){ if(l&&l.id)save('lancamentos/'+l.id,l,false) });
+  /* os demais perfis vao cada um para o seu proprio espaco */
+  var pd=o.perfisDados||{};
+  Object.keys(pd).forEach(function(id){ if(id!==PERFIL) gravaPerfil(id,pd[id]) });
   fechaCadastro(); toast('Backup restaurado'); render();
 }
 function avisoLocal(){

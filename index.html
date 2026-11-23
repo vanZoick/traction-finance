@@ -3758,7 +3758,10 @@ function modoLocal(){
 }
 function usaBanco(db,id){ LOCAL=false; DB=db; RAIZ='data/users/'+id+'/dados/'; inicia() }
 
-if(FB&&FB.apiKey){ modoSite(); } else { ligaArtefato(); }
+/* Dentro do Claude, manda a camada do artefato; fora dele (site publicado),
+   o modo site com e-mail e senha. Assim o mesmo arquivo serve aos dois. */
+if((typeof claude!=='undefined'&&claude&&claude.use)||!(FB&&FB.apiKey)){ ligaArtefato(); }
+else { modoSite(); }
 
 function ligaArtefato(){
 var temClaude=(typeof claude!=='undefined'&&claude&&claude.use);

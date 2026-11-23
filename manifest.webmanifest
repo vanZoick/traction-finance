@@ -1,0 +1,20 @@
+{
+  "name": "Traction Finance",
+  "short_name": "Traction",
+  "description": "Seu dinheiro em uma tela só: entradas, saídas, cartões, dívidas, reserva e quanto dá para gastar hoje.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "id": "/traction-finance/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#062F28",
+  "theme_color": "#062F28",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "./icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

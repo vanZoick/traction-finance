@@ -1,3 +1,17 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Seu dinheiro em uma tela só: entradas, saídas, cartões, dívidas, reserva e quanto dá para gastar hoje.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#062F28">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icone-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="./icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Traction">
 <title>Traction Finance (beta.v1)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,6 +33,7 @@
   --ambar:#8A6A12; --ambar-mark:#D3A82A; --ambar-bg:#F9F2DE;
   --shadow:0 1px 2px rgba(6,47,40,.035), 0 8px 24px rgba(6,47,40,.05);
   --on-brand:#FFFFFF;
+  --toast-bg:#062F28; --toast-ink:#FFFFFF;
   --fc:'Cormorant Garamond',Georgia,'Times New Roman',serif;
   --fh:'Urbanist','Segoe UI',Helvetica,Arial,sans-serif;
   --fd:'Urbanist','Segoe UI',Helvetica,Arial,sans-serif;
@@ -36,6 +51,7 @@
   --verde:#3FC08C; --verde-bg:#0B3828; --vermelho:#F08078; --vermelho-bg:#3B1B19;
   --azul:#4DA6FF; --azul-bg:#0C2B4E; --ambar:#E9BA5C; --ambar-mark:#E9BA5C; --ambar-bg:#37290E;
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.45);
+  --toast-bg:#1E3A32; --toast-ink:#E6F2EC;
   color-scheme:dark;
 }}
 :root[data-theme="dark"]{
@@ -49,6 +65,7 @@
   --verde:#3FC08C; --verde-bg:#0B3828; --vermelho:#F08078; --vermelho-bg:#3B1B19;
   --azul:#4DA6FF; --azul-bg:#0C2B4E; --ambar:#E9BA5C; --ambar-mark:#E9BA5C; --ambar-bg:#37290E;
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.45);
+  --toast-bg:#1E3A32; --toast-ink:#E6F2EC;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -514,12 +531,12 @@ svg.ch text{font-family:var(--fb);font-size:10.5px;fill:var(--muted)}
 .tbl td{text-align:right;padding:7px 9px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
 .tbl td.pos{color:var(--verde)} .tbl td.neg{color:var(--vermelho)}
 
-.toast{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--sidebar);
-  color:#fff;border-radius:10px;padding:9px 11px 9px 16px;font-size:13px;font-weight:700;box-shadow:0 8px 28px rgba(0,0,0,.28);
+.toast{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:60;background:var(--toast-bg);
+  color:var(--toast-ink);border-radius:10px;padding:9px 11px 9px 16px;font-size:13px;font-weight:700;box-shadow:0 8px 28px rgba(0,0,0,.28);
   opacity:0;transform:translateY(8px);transition:opacity .16s,transform .16s;pointer-events:none;
   display:flex;align-items:center;gap:12px;justify-content:center}
 .toast.on{opacity:1;transform:translateY(0);pointer-events:auto}
-.toast .tu{background:rgba(255,255,255,.17);border-radius:7px;padding:5px 11px;font-size:12px;font-weight:800;color:#fff;flex:0 0 auto}
+.toast .tu{background:rgba(255,255,255,.17);border-radius:7px;padding:5px 11px;font-size:12px;font-weight:800;color:var(--toast-ink);flex:0 0 auto}
 .toast .tu:hover{background:rgba(255,255,255,.3)}
 .toast .tu[hidden]{display:none}
 @media (max-width:860px){.toast{bottom:calc(80px + env(safe-area-inset-bottom,0px));right:12px;left:12px;text-align:center}}
@@ -3839,3 +3856,18 @@ Promise.all([ temClaude?claude.use('db'):null, temClaude?claude.use('user'):null
 }
 })();
 </script>
+
+<script>
+/* Instalação como app. O service worker só existe no site publicado:
+   em file:// e dentro do artefato o navegador recusa, e o try/catch
+   deixa a página seguir normalmente. */
+(function(){
+  if(!('serviceWorker' in navigator)) return;
+  if(!window.isSecureContext) return;   /* https e localhost sim; file:// nao */
+  window.addEventListener('load',function(){
+    try{ navigator.serviceWorker.register('./sw.js').catch(function(){}) }catch(e){}
+  });
+})();
+</script>
+</body>
+</html>

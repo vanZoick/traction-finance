@@ -3,9 +3,10 @@
    quando há rede. Por isso a página vem da rede primeiro, com o que está
    guardado como rede de segurança. As fontes do Google, que não mudam,
    vêm do cache primeiro. O Firebase nunca passa por aqui. */
-var CACHE = 'traction-finance-v1';
+var CACHE = 'traction-finance-v2';
 var ESSENCIAIS = ['./', './manifest.webmanifest', './icone-192.png',
-                  './icone-512.png', './icone-180.png'];
+                  './icone-512.png', './icone-180.png',
+                  './icone-maskable-512.png'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(

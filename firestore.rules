@@ -48,12 +48,40 @@ service cloud.firestore {
     }
 
     // -----------------------------------------------------------------
-    // A lista de convidados. Fechada para a aplicação inteira: a função
-    // convidado() acima consegue consultá-la porque exists() roda com
-    // privilégio de servidor, mas nenhuma página consegue ler nem
-    // escrever aqui. Você convida e revoga pelo console.
+    // A lista de convidados.
+    //
+    // Ninguém lê, edita nem apaga, nunca — nem o próprio dono do convite.
+    // A única coisa permitida é CRIAR o próprio convite, e só com um
+    // código válido. Três condições, todas obrigatórias:
+    //
+    //   1. o id do documento é o e-mail da conta que está gravando, então
+    //      ninguém libera o e-mail de outra pessoa;
+    //   2. o documento tem exatamente os campos `codigo` e `quando`;
+    //   3. existe um documento com esse código na coleção `codigos`.
+    //
+    // Para abrir o beta, crie em `codigos` um documento cujo ID é o código
+    // (por exemplo REMADA2027) — o conteúdo não importa. Para fechar,
+    // apague esse documento: quem já entrou continua, quem não entrou para
+    // na porta.
     // -----------------------------------------------------------------
     match /convites/{email} {
+      allow create: if request.auth != null
+                    && request.auth.token.email != null
+                    && request.auth.token.email.lower() == email
+                    && request.resource.data.keys().hasOnly(['codigo','quando'])
+                    && request.resource.data.codigo is string
+                    && request.resource.data.codigo.matches('^[A-Z0-9_-]{3,40}$')
+                    && exists(/databases/$(database)/documents/codigos/$(request.resource.data.codigo));
+      allow read, update, delete: if false;
+    }
+
+    // -----------------------------------------------------------------
+    // Os códigos de convite. Fechados para a aplicação inteira: a regra
+    // acima os consulta porque exists() roda com privilégio de servidor,
+    // mas nenhuma página consegue listá-los nem adivinhá-los lendo daqui.
+    // Você cria e apaga pelo console.
+    // -----------------------------------------------------------------
+    match /codigos/{codigo} {
       allow read, write: if false;
     }
 

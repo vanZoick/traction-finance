@@ -3614,7 +3614,7 @@ function abreLogin(A,auth,aviso){
             : modo==='criar'?'Crie a sua conta'
             : 'Recuperar a senha';
     var sub = modo==='entrar'?'Use o e-mail e a senha do seu cadastro. Os seus dados abrem em qualquer aparelho.'
-            : modo==='criar'?'O beta est\u00e1 aberto s\u00f3 para quem foi convidado \u2014 use o e-mail que recebeu o convite.'
+            : modo==='criar'?'O beta \u00e9 por convite. Use o c\u00f3digo que voc\u00ea recebeu junto com o link.'
             : 'Mandamos um link para voc\u00ea criar uma senha nova.';
     var rot = modo==='entrar'?'Entrar' : modo==='criar'?'Criar conta' : 'Mandar o link';
     var pe  = modo==='criar'?'Pelo menos 6 caracteres':'Sua senha';
@@ -3632,6 +3632,9 @@ function abreLogin(A,auth,aviso){
      +(modo!=='esqueci'?('<label class="cadl" for="lgS"><span>Senha</span>'
        +'<input id="lgS" type="password" autocomplete="'+(modo==='criar'?'new-password':'current-password')
        +'" placeholder="'+pe+'"></label>'):'')
+     +(modo==='criar'?('<label class="cadl" for="lgC"><span>C\u00f3digo de convite</span>'
+       +'<input id="lgC" type="text" autocomplete="off" spellcheck="false"'
+       +' placeholder="O c\u00f3digo que veio com o link"></label>'):'')
      +'<button class="cadb" id="lgOk">'+rot+'</button>'
      +'<p class="cadn">'+alt+'</p></div>';
     var e=d.querySelector('#lgE'); if(e)e.focus();
@@ -3644,6 +3647,10 @@ function abreLogin(A,auth,aviso){
     var em=String((d.querySelector('#lgE')||{}).value||'').trim();
     var se=String((d.querySelector('#lgS')||{}).value||'');
     if(!em){ msg='Falta o e-mail.'; bom=''; pinta(); return }
+    if(modo==='criar'){
+      CONVITE=normCod((d.querySelector('#lgC')||{}).value);
+      if(!CONVITE){ msg='Falta o c\u00f3digo de convite.'; bom=''; pinta(); return }
+    }
     trava(true); msg=''; bom='';
     var p = modo==='entrar' ? A.signInWithEmailAndPassword(auth,em,se)
           : modo==='criar'  ? A.createUserWithEmailAndPassword(auth,em,se)
@@ -3663,20 +3670,57 @@ function abreLogin(A,auth,aviso){
   pinta();
 }
 
-/* Conta criada, mas o e-mail ainda nao esta na lista do beta: quem decide isso
-   e a regra do Firestore, entao a recusa da gravacao e a propria resposta. */
-function telaEspera(A,auth,em){
+/* O codigo digitado no cadastro, usado assim que a conta entra. */
+var CONVITE='';
+function normCod(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,'') }
+
+/* Cria o proprio convite. A regra do Firestore so aceita se o codigo existir
+   na colecao `codigos` e se o e-mail do documento for o da conta que grava \u2014
+   ou seja, ninguem entra sem o codigo e ninguem libera o e-mail de outro. */
+function gravaConvite(ad,u,cod){
+  return ad.doc('convites/'+String(u.email||'').toLowerCase())
+           .set({ codigo:cod, quando:new Date().toISOString() });
+}
+
+/* Conta criada, mas ainda sem convite: a recusa da gravacao e a propria
+   resposta, entao aqui pedimos o codigo e tentamos de novo. */
+function telaCodigo(A,auth,u,tenta,entra,aviso){
   fechaLogin();
   var d=document.createElement('div'); d.id='logw'; d.className='cadw';
-  d.innerHTML='<div class="cadc">'
-   +'<div class="logo" role="img" aria-label="Traction Finance"><span class="cap">Traction</span><span class="dsc">Finance</span></div>'
-   +'<h2>Sua conta foi criada</h2>'
-   +'<p class="cadp">S\u00f3 que <b>'+esc(em||'esse e-mail')+'</b> ainda n\u00e3o est\u00e1 na lista do beta, '
-   +'ent\u00e3o o painel n\u00e3o consegue guardar nada por enquanto. Avise quem te convidou \u2014 '
-   +'assim que o e-mail for liberado, \u00e9 s\u00f3 entrar de novo.</p>'
-   +'<button class="cadb" id="lgSair">Sair</button></div>';
   document.body.appendChild(d);
-  d.querySelector('#lgSair').onclick=function(){ A.signOut(auth) };
+  var msg=aviso||'';
+
+  function pinta(){
+    d.innerHTML='<div class="cadc">'
+     +'<div class="logo" role="img" aria-label="Traction Finance"><span class="cap">Traction</span><span class="dsc">Finance</span></div>'
+     +'<h2>Falta o c\u00f3digo de convite</h2>'
+     +'<p class="cadp">A sua conta foi criada com <b>'+esc(u.email||'esse e-mail')+'</b>, '
+     +'mas o beta \u00e9 por convite. Digite o c\u00f3digo que veio junto com o link \u2014 '
+     +'se voc\u00ea n\u00e3o tem um, pe\u00e7a a quem te mandou.</p>'
+     +(msg?'<div class="loge">'+esc(msg)+'</div>':'')
+     +'<label class="cadl" for="lgC"><span>C\u00f3digo de convite</span>'
+     +'<input id="lgC" type="text" autocomplete="off" spellcheck="false"'
+     +' placeholder="O c\u00f3digo que veio com o link"></label>'
+     +'<button class="cadb" id="lgOk">Entrar no beta</button>'
+     +'<p class="cadn"><button class="lgalt" id="lgSair">Sair</button></p></div>';
+    var e=d.querySelector('#lgC'); if(e)e.focus();
+  }
+
+  function envia(){
+    var cod=normCod((d.querySelector('#lgC')||{}).value);
+    if(!cod){ msg='Digite o c\u00f3digo.'; pinta(); return }
+    var b=d.querySelector('#lgOk'); if(b){ b.disabled=true; b.textContent='Um instante\u2026' }
+    tenta(cod).then(entra).catch(function(){
+      msg='Esse c\u00f3digo n\u00e3o confere. Confira com quem te convidou.'; pinta();
+    });
+  }
+
+  d.addEventListener('click',function(ev){
+    if(ev.target.closest('#lgSair')){ CONVITE=''; A.signOut(auth); return }
+    if(ev.target.closest('#lgOk')) envia();
+  });
+  d.addEventListener('keydown',function(ev){ if(ev.key==='Enter')envia() });
+  pinta();
 }
 
 function sair(){
@@ -3731,10 +3775,17 @@ function modoSite(){
       if(!u){ abreLogin(A,auth); return }
       EMAIL=u.email||'';
       var r='usuarios/'+u.uid+'/painel/dados/', ad=adaptaFirestore(fs,Fs);
-      /* a regra do Firestore e a lista do beta: se a gravacao passa, esta liberado */
-      ad.doc(r+'meta/acesso').set({visto:new Date().toISOString()}).then(function(){
-        DB=ad; RAIZ=r; LOCAL=false; fechaLogin(); inicia();
-      }).catch(function(){ telaEspera(A,auth,u.email) });
+      function entra(){ DB=ad; RAIZ=r; LOCAL=false; fechaLogin(); inicia() }
+      /* a regra do Firestore decide: se a gravacao passa, esta liberado */
+      function prova(){ return ad.doc(r+'meta/acesso').set({visto:new Date().toISOString()}) }
+      function tenta(cod){ return cod ? gravaConvite(ad,u,cod).then(prova) : prova() }
+      var pend=CONVITE; CONVITE='';
+      tenta('').then(entra).catch(function(){
+        if(!pend){ telaCodigo(A,auth,u,tenta,entra,''); return }
+        tenta(pend).then(entra).catch(function(){
+          telaCodigo(A,auth,u,tenta,entra,'Esse c\u00f3digo n\u00e3o confere. Confira com quem te convidou.');
+        });
+      });
     });
   }).catch(function(e){
     console.warn('firebase',e);
